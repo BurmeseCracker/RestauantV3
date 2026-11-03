@@ -1,32 +1,39 @@
 -- Script Path: game:GetService("StarterPlayer").StarterPlayerScripts.Source.Modules.Tasks.RestaurantTycoonManager
--- Optimized & Self-Refreshing Silent Master Script
+-- Ultimate Clean Master Script (Draggable, Semi-Transparent Black UI with Top-Left Close Icon)
 
 print("[DEBUG] --- LOCAL PLAYER RESTAURANT MANAGER LOADED ---")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerScripts = LocalPlayer.PlayerScripts
 
--- Require native systems safely
-local successCustomers, Customers = pcall(function() return require(PlayerScripts.Source.Systems.Restaurant.Customers) end)
-local successCustomerState, CustomerState = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Customer.CustomerState) end)
-local successCustomerType, CustomerType = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Customer.CustomerType) end)
-local successTaskEnum, TaskEnum = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Task) end)
-local successItemType, ItemType = pcall(function() return require(ReplicatedStorage.Source.Enums.Placement.ItemType) end)
-local successGrabFood, GrabFood = pcall(function() return require(PlayerScripts.Source.Systems.Restaurant.GrabFood) end)
+-- ---------------------------------------------------------------------------
+-- Native Systems & Enums Safe Requirement
+-- ---------------------------------------------------------------------------
+local _, Customers = pcall(function() return require(PlayerScripts.Source.Systems.Restaurant.Customers) end)
+local _, CustomerState = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Customer.CustomerState) end)
+local _, CustomerType = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Customer.CustomerType) end)
+local _, TaskEnum = pcall(function() return require(ReplicatedStorage.Source.Enums.Restaurant.Task) end)
+local _, ItemType = pcall(function() return require(ReplicatedStorage.Source.Enums.Placement.ItemType) end)
+local _, GrabFood = pcall(function() return require(PlayerScripts.Source.Systems.Restaurant.GrabFood) end)
+local _, TasksSys = pcall(function() return require(PlayerScripts.Source.Systems.Restaurant.Tasks) end)
 
 local isRunning = true
 
--- All toggles start OFF by default
+-- ---------------------------------------------------------------------------
+-- Toggle States (All start OFF by default)
+-- ---------------------------------------------------------------------------
 local autoCollectDishesEnabled = false
 local autoCollectBillsEnabled = false
 local autoTakeOrderEnabled = false
 local autoServeEnabled = false
-local autoAssignTableEnabled = false
 
--- Create Unified Control Panel GUI (5 Toggles + Kill Button)
+-- ---------------------------------------------------------------------------
+-- Control Panel GUI Setup (Transparent Black, Draggable, Top-Left Close Icon)
+-- ---------------------------------------------------------------------------
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 if playerGui:FindFirstChild("RestaurantTycoonManagerUI") then
     playerGui.RestaurantTycoonManagerUI:Destroy()
@@ -38,9 +45,10 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 235)
+frame.Size = UDim2.new(0, 180, 0, 205)
 frame.Position = UDim2.new(0, 20, 0, 100)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0.35 -- Semi-transparent cool black background
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
@@ -48,12 +56,58 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 8)
 corner.Parent = frame
 
+-- Draggable Functionality
+local dragging, dragInput, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Top-Most Left Cancel / Close Icon Button ("X")
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(0, 6, 0, 6)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 13
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.Text = "X"
+closeBtn.Parent = frame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 4)
+closeCorner.Parent = closeBtn
+
+-- Menu Title (Shifted slightly right to accommodate the close icon)
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
+title.Size = UDim2.new(1, -35, 0, 30)
+title.Position = UDim2.new(0, 32, 0, 2)
 title.BackgroundTransparency = 1
-title.Text = "Restaurant Tycoon 3 V1"
+title.Text = "Restaurant Tycoon 3"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 13
+title.TextSize = 12
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
@@ -61,7 +115,7 @@ local function createButton(position, text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 160, 0, 24)
     btn.Position = position
-    btn.BackgroundColor3 = Color3.fromRGB(120, 120, 120) -- OFF gray
+    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- OFF dark gray
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.TextSize = 12
     btn.Font = Enum.Font.SourceSansBold
@@ -74,51 +128,54 @@ local function createButton(position, text)
     return btn
 end
 
-local toggleDishesBtn = createButton(UDim2.new(0, 10, 0, 35), "Dishes: OFF")
-local toggleBillsBtn = createButton(UDim2.new(0, 10, 0, 65), "Bills & Tips: OFF")
-local toggleOrderBtn = createButton(UDim2.new(0, 10, 0, 95), "Take Orders: OFF")
-local toggleServeBtn = createButton(UDim2.new(0, 10, 0, 125), "Serve Food: OFF")
-local toggleTableBtn = createButton(UDim2.new(0, 10, 0, 155), "Assign Tables: OFF")
-local killBtn = createButton(UDim2.new(0, 10, 0, 190), "Kill Script")
-killBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+local toggleDishesBtn = createButton(UDim2.new(0, 10, 0, 38), "Dishes: OFF")
+local toggleBillsBtn = createButton(UDim2.new(0, 10, 0, 68), "Bills & Tips: OFF")
+local toggleOrderBtn = createButton(UDim2.new(0, 10, 0, 98), "Take Orders: OFF")
+local toggleServeBtn = createButton(UDim2.new(0, 10, 0, 128), "Serve Food: OFF")
 
+-- Kill / Cancel Button at the bottom
+local killButton = createButton(UDim2.new(0, 10, 0, 165), "Kill Script")
+killButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+
+-- ---------------------------------------------------------------------------
+-- Button Event Handlers
+-- ---------------------------------------------------------------------------
 toggleDishesBtn.MouseButton1Click:Connect(function()
     autoCollectDishesEnabled = not autoCollectDishesEnabled
     toggleDishesBtn.Text = autoCollectDishesEnabled and "Dishes: ON" or "Dishes: OFF"
-    toggleDishesBtn.BackgroundColor3 = autoCollectDishesEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(120, 120, 120)
+    toggleDishesBtn.BackgroundColor3 = autoCollectDishesEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
 toggleBillsBtn.MouseButton1Click:Connect(function()
     autoCollectBillsEnabled = not autoCollectBillsEnabled
     toggleBillsBtn.Text = autoCollectBillsEnabled and "Bills & Tips: ON" or "Bills & Tips: OFF"
-    toggleBillsBtn.BackgroundColor3 = autoCollectBillsEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(120, 120, 120)
+    toggleBillsBtn.BackgroundColor3 = autoCollectBillsEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
 toggleOrderBtn.MouseButton1Click:Connect(function()
     autoTakeOrderEnabled = not autoTakeOrderEnabled
     toggleOrderBtn.Text = autoTakeOrderEnabled and "Take Orders: ON" or "Take Orders: OFF"
-    toggleOrderBtn.BackgroundColor3 = autoTakeOrderEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(120, 120, 120)
+    toggleOrderBtn.BackgroundColor3 = autoTakeOrderEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
 toggleServeBtn.MouseButton1Click:Connect(function()
     autoServeEnabled = not autoServeEnabled
     toggleServeBtn.Text = autoServeEnabled and "Serve Food: ON" or "Serve Food: OFF"
-    toggleServeBtn.BackgroundColor3 = autoServeEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(120, 120, 120)
+    toggleServeBtn.BackgroundColor3 = autoServeEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(80, 80, 80)
 end)
 
-toggleTableBtn.MouseButton1Click:Connect(function()
-    autoAssignTableEnabled = not autoAssignTableEnabled
-    toggleTableBtn.Text = autoAssignTableEnabled and "Assign Tables: ON" or "Assign Tables: OFF"
-    toggleTableBtn.BackgroundColor3 = autoAssignTableEnabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(120, 120, 120)
-end)
-
-killBtn.MouseButton1Click:Connect(function()
+local function TerminateScript()
     isRunning = false
     screenGui:Destroy()
-    print("[DEBUG] Script killed and UI removed.")
-end)
+    print("[DEBUG] Script killed and UI removed successfully.")
+end
 
--- STRICT Local Player Tycoon Finder
+closeBtn.MouseButton1Click:Connect(TerminateScript)
+killButton.MouseButton1Click:Connect(TerminateScript)
+
+-- ---------------------------------------------------------------------------
+-- Helper Functions
+-- ---------------------------------------------------------------------------
 local function GetLocalTycoon()
     local tycoonsFolder = workspace:FindFirstChild("Tycoons")
     if not tycoonsFolder then return nil end
@@ -146,39 +203,29 @@ end
 
 local function GetValidTables(surfaceFolder)
     local tables = {}
+    local seenInstances = {}
     for _, child in ipairs(surfaceFolder:GetChildren()) do
-        if child:IsA("Model") and child.Name:match("^T%d+") then
+        if child:IsA("Model") and child.Name:match("^T%d+") and not seenInstances[child] then
+            seenInstances[child] = true
             table.insert(tables, child)
         end
     end
     return tables
 end
 
-local function HasNearbyChair(tycoon, tableModel)
-    local furnitureFolder = tycoon:FindFirstChild("Items") and tycoon.Items:FindFirstChild("Furniture")
-    if not furnitureFolder then return true end
-
-    local tablePos = tableModel:GetPivot().Position
-
-    for _, chairModel in ipairs(furnitureFolder:GetChildren()) do
-        if chairModel:IsA("Model") and chairModel.Name:match("^C%d+") then
-            local chairPos = chairModel:GetPivot().Position
-            if (Vector3.new(tablePos.X, 0, tablePos.Z) - Vector3.new(chairPos.X, 0, chairPos.Z)).Magnitude < 5 then
-                return true
-            end
+local function ClearNativeTaskLock()
+    pcall(function()
+        if TasksSys then
+            if TasksSys.ResetTask then TasksSys:ResetTask() end
+            if TasksSys.FinishTask then TasksSys:FinishTask() end
         end
-    end
-
-    return false
+    end)
 end
 
+-- ---------------------------------------------------------------------------
+-- Automation Action Handlers
+-- ---------------------------------------------------------------------------
 local processedTrash = {}
-local processedBills = {}
-local processedTipJars = {}
-local processedOrders = {}
-local processedAssignments = {}
-local tableFailCounts = {}
-
 local function ProcessDishes(tycoon, tableModel)
     if not isRunning or not autoCollectDishesEnabled then return end
     local trash = tableModel:FindFirstChild("Trash")
@@ -190,10 +237,12 @@ local function ProcessDishes(tycoon, tableModel)
         FurnitureModel = tableModel,
         Tycoon = tycoon
     })
+    ClearNativeTaskLock()
     
-    task.delay(2, function() processedTrash[trash] = nil end)
+    task.delay(1.5, function() processedTrash[trash] = nil end)
 end
 
+local processedBills = {}
 local function ProcessBills(tycoon, tableModel)
     if not isRunning or not autoCollectBillsEnabled then return end
     local billObj = tableModel:FindFirstChild("Bill", true)
@@ -205,10 +254,12 @@ local function ProcessBills(tycoon, tableModel)
         FurnitureModel = tableModel,
         Tycoon = tycoon
     })
+    ClearNativeTaskLock()
 
-    task.delay(2, function() processedBills[billObj] = nil end)
+    task.delay(1.5, function() processedBills[billObj] = nil end)
 end
 
+local processedTipJars = {}
 local function ProcessTipJar(tycoon, tipJarModel)
     if not isRunning or not autoCollectBillsEnabled then return end
     local tipValue = tipJarModel:GetAttribute("Value") or 0
@@ -217,9 +268,10 @@ local function ProcessTipJar(tycoon, tipJarModel)
     processedTipJars[tipJarModel] = true
     ReplicatedStorage.Events.Restaurant.TipsCollected:FireServer(tycoon)
 
-    task.delay(3, function() processedTipJars[tipJarModel] = nil end)
+    task.delay(2, function() processedTipJars[tipJarModel] = nil end)
 end
 
+local processedOrders = {}
 local function CheckDynamicOrders(tycoon)
     if not isRunning or not autoTakeOrderEnabled then return end
 
@@ -243,8 +295,9 @@ local function CheckDynamicOrders(tycoon)
                         CustomerId = customerId,
                         Tycoon = tycoon
                     })
+                    ClearNativeTaskLock()
 
-                    task.delay(3, function() processedOrders[customerObj] = nil end)
+                    task.delay(2, function() processedOrders[customerObj] = nil end)
                 end
             end
         end
@@ -289,96 +342,32 @@ local function CheckAndServeFood(tycoon)
                         FoodModel = heldFood.Model,
                         Tycoon = tycoon
                     })
+                    ClearNativeTaskLock()
                 end
             end
         end
     end
 end
 
-local function CheckAndAssignTables(tycoon)
-    if not isRunning or not autoAssignTableEnabled then return end
-
-    local clientCustomers = tycoon:FindFirstChild("ClientCustomers")
-    local surfaceFolder = tycoon:FindFirstChild("Items") and tycoon.Items:FindFirstChild("Surface")
-    if not clientCustomers or not surfaceFolder then return end
-
-    for _, groupFolder in ipairs(clientCustomers:GetChildren()) do
-        if not autoAssignTableEnabled then break end
-        local groupId = groupFolder.Name
-
-        if Customers:GetGroupState(tycoon, groupId) == CustomerState.Entered and not processedAssignments[groupId] then
-            local availableTable = nil
-            
-            for _, tableModel in ipairs(GetValidTables(surfaceFolder)) do
-                if not tableFailCounts[tableModel] then
-                    local hasCustomers = tableModel:FindFirstChild("Customers") and #tableModel.Customers:GetChildren() > 0
-                    local trashObj = tableModel:FindFirstChild("Trash")
-                    local hasTrash = trashObj and trashObj:GetAttribute("Collectable") == true
-                    local billObj = tableModel:FindFirstChild("Bill", true)
-                    local hasUncollectedBill = billObj and billObj:GetAttribute("Taken") ~= true
-                    local isOccupiedByAttr = tableModel:GetAttribute("Occupied") == true or tableModel:GetAttribute("GroupId") ~= nil
-                    local hasChairNearby = HasNearbyChair(tycoon, tableModel)
-
-                    if not hasCustomers and not hasTrash and not hasUncollectedBill and not isOccupiedByAttr and hasChairNearby then
-                        availableTable = tableModel
-                        break
-                    end
-                end
-            end
-
-            if availableTable then
-                processedAssignments[groupId] = true
-                ReplicatedStorage.Events.Restaurant.TaskCompleted:FireServer({
-                    Name = TaskEnum.SendToTable,
-                    GroupId = groupId,
-                    FurnitureModel = availableTable,
-                    Tycoon = tycoon
-                })
-
-                task.delay(1.5, function()
-                    if Customers:GetGroupState(tycoon, groupId) == CustomerState.Entered then
-                        tableFailCounts[availableTable] = (tableFailCounts[availableTable] or 0) + 1
-                        if tableFailCounts[availableTable] >= 2 then
-                            task.delay(10, function() tableFailCounts[availableTable] = nil end)
-                        end
-                    else
-                        tableFailCounts[availableTable] = nil
-                    end
-                end)
-
-                task.delay(4, function() processedAssignments[groupId] = nil end)
-                break
-            else
-                processedAssignments[groupId] = true
-                task.delay(2, function() processedAssignments[groupId] = nil end)
-            end
-        end
-    end
-end
-
--- Self-Refreshing & Error-Protected Background Loop
+-- ---------------------------------------------------------------------------
+-- Main Background Processing Loop
+-- ---------------------------------------------------------------------------
 task.spawn(function()
-    print("[DEBUG] Local Player manager loop started!")
     while isRunning do
-        task.wait(0.3)
-        
-        -- Wrap execution in pcall to guarantee self-refreshing stability on error
+        task.wait(0.4)
         pcall(function()
-            if autoCollectDishesEnabled or autoCollectBillsEnabled or autoTakeOrderEnabled or autoServeEnabled or autoAssignTableEnabled then
+            if not isRunning then return end
+            if autoCollectDishesEnabled or autoCollectBillsEnabled or autoTakeOrderEnabled or autoServeEnabled then
                 local tycoon = GetLocalTycoon()
                 if tycoon then
-                    if autoAssignTableEnabled then
-                        CheckAndAssignTables(tycoon)
-                    end
-
                     if autoTakeOrderEnabled then
                         CheckDynamicOrders(tycoon)
                     end
-
+                    
                     if autoServeEnabled then
                         CheckAndServeFood(tycoon)
                     end
-
+                    
                     if autoCollectDishesEnabled or autoCollectBillsEnabled then
                         local surfaceFolder = tycoon:FindFirstChild("Items") and tycoon.Items:FindFirstChild("Surface")
                         if surfaceFolder then
@@ -391,7 +380,7 @@ task.spawn(function()
                                         ProcessDishes(tycoon, tableModel)
                                     end
                                 end
-
+                                
                                 if autoCollectBillsEnabled then
                                     local hasBill = tableModel:FindFirstChild("Bill", true)
                                     if hasBill then
@@ -400,10 +389,11 @@ task.spawn(function()
                                 end
                             end
                         end
-
+                        
                         local itemsFolder = tycoon:FindFirstChild("Items")
                         if autoCollectBillsEnabled and itemsFolder then
                             for _, descendant in ipairs(itemsFolder:GetDescendants()) do
+                                if not isRunning then break end
                                 if descendant:IsA("Model") and descendant:GetAttribute("ItemType") == ItemType.TipJar then
                                     ProcessTipJar(tycoon, descendant)
                                 end
@@ -414,7 +404,6 @@ task.spawn(function()
             end
         end)
     end
-    print("[DEBUG] Local Player manager loop terminated.")
 end)
 
 return {
